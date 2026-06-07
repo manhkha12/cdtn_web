@@ -1,6 +1,17 @@
 import type { Student } from "../types";
 
-export const attendanceStudentsMockData: Student[] = [
+// Bổ sung thêm trường dữ liệu để phục vụ UC16 (Thống kê)
+export interface AttendanceStudent extends Student {
+  dbStudentId?: string;      // ID sinh viên thực tế trong database
+  absenceRate: number;      // Tỷ lệ vắng mặt (%)
+  totalAbsences: number;   // Tổng số tiết/buổi đã nghỉ
+  attendanceHistory: {     // Lịch sử các buổi trước (để phục vụ UC16 kịch bản 6)
+    date: string;
+    status: "present" | "absent" | "late" | "ai_verified";
+  }[];
+}
+
+export const attendanceStudentsMockData: AttendanceStudent[] = [
   {
     id: "1",
     studentId: "STU-2024-001",
@@ -8,6 +19,9 @@ export const attendanceStudentsMockData: Student[] = [
     email: "alice.johnson@university.edu",
     avatar: "AJ",
     status: "ai_verified",
+    absenceRate: 5,
+    totalAbsences: 1,
+    attendanceHistory: [{ date: "2026-03-10", status: "present" }]
   },
   {
     id: "2",
@@ -16,6 +30,9 @@ export const attendanceStudentsMockData: Student[] = [
     email: "bob.smith@university.edu",
     avatar: "BS",
     status: "present",
+    absenceRate: 18.5, // UC16: Sẽ bị cảnh báo đỏ (>15%)
+    totalAbsences: 4,
+    attendanceHistory: [{ date: "2026-03-10", status: "absent" }]
   },
   {
     id: "3",
@@ -24,6 +41,9 @@ export const attendanceStudentsMockData: Student[] = [
     email: "charlie.brown@university.edu",
     avatar: "CB",
     status: "absent",
+    absenceRate: 22, // UC16: Cảnh báo nguy cơ cấm thi (>20%)
+    totalAbsences: 5,
+    attendanceHistory: [{ date: "2026-03-10", status: "absent" }]
   },
   {
     id: "4",
@@ -32,62 +52,9 @@ export const attendanceStudentsMockData: Student[] = [
     email: "diana.prince@university.edu",
     avatar: "DP",
     status: "late",
-  },
-  {
-    id: "5",
-    studentId: "STU-2024-005",
-    name: "Ethan Hunt",
-    email: "ethan.hunt@university.edu",
-    avatar: "EH",
-    status: "present",
-  },
-  {
-    id: "6",
-    studentId: "STU-2024-006",
-    name: "Fiona Green",
-    email: "fiona.green@university.edu",
-    avatar: "FG",
-    status: "present",
-  },
-  {
-    id: "7",
-    studentId: "STU-2024-007",
-    name: "George Miller",
-    email: "george.miller@university.edu",
-    avatar: "GM",
-    status: "present",
-  },
-  {
-    id: "8",
-    studentId: "STU-2024-008",
-    name: "Hannah Davis",
-    email: "hannah.davis@university.edu",
-    avatar: "HD",
-    status: "present",
-  },
-  {
-    id: "9",
-    studentId: "STU-2024-009",
-    name: "Isaac Wilson",
-    email: "isaac.wilson@university.edu",
-    avatar: "IW",
-    status: "late",
-  },
-  {
-    id: "10",
-    studentId: "STU-2024-010",
-    name: "Julia Anderson",
-    email: "julia.anderson@university.edu",
-    avatar: "JA",
-    status: "present",
-  },
-  {
-    id: "11",
-    studentId: "STU-2024-011",
-    name: "Kevin Taylor",
-    email: "kevin.taylor@university.edu",
-    avatar: "KT",
-    status: "present",
+    absenceRate: 12,
+    totalAbsences: 2,
+    attendanceHistory: [{ date: "2026-03-10", status: "late" }]
   },
   {
     id: "12",
@@ -96,5 +63,9 @@ export const attendanceStudentsMockData: Student[] = [
     email: "lucy.martinez@university.edu",
     avatar: "LM",
     status: "ai_verified",
+    absenceRate: 2,
+    totalAbsences: 0,
+    attendanceHistory: [{ date: "2026-03-10", status: "present" }]
   },
+  // Các sinh viên khác bạn có thể thêm tương tự...
 ];

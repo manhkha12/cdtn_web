@@ -1,39 +1,64 @@
-import React, { useState } from "react";
-import type { ReactNode } from "react";
+import React from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import SidebarComponent from "./SidebarComponent";
 import TopbarComponent from "./TopbarComponent";
+import { NotificationService } from "../../services/NotificationService";
+import toast from "react-hot-toast";
 
-interface DashboardLayoutProps {
-  children: ReactNode;
-  onNavigate?: (page: string) => void;
-}
+export const DashboardLayout: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
-  children,
-  onNavigate,
-}) => {
-  const [activeMenu, setActiveMenu] = useState<string>("dashboard");
+  const activeMenu = location.pathname.split("/")[1] || "dashboard";
 
   const handleMenuChange = (menu: string) => {
-    setActiveMenu(menu);
-    onNavigate?.(menu);
+    navigate(`/${menu}`);
   };
 
+  React.useEffect(() => {
+    let isSubscribed = true;
+
+    const initFCM = async () => {
+      try {
+        const token = await NotificationService.requestPermissionAndRegister();
+        if (token && isSubscribed) {
+          console.log("FCM initialized and token registered");
+        }
+      } catch (err) {
+        console.error("FCM Init Error:", err);
+      }
+    };
+    
+    initFCM();
+
+    const unsubscribe = NotificationService.onForegroundMessage((payload) => {
+      if (isSubscribed) {
+        toast(payload.notification.body || "Bạn có thông báo mới", {
+          icon: '🔔',
+          duration: 4000,
+        });
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
+  }, []);
+
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#f4f6f9]">
       <SidebarComponent
         activeMenu={activeMenu}
         onMenuChange={handleMenuChange}
       />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <TopbarComponent notificationCount={3} />
+        <TopbarComponent notificationCount={0} /> 
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-[#f4f6f9] p-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
