@@ -55,6 +55,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      console.log("[AuthContext] Received auth:unauthorized event, logging out...");
+      logout();
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
+  }, []);
+
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, refreshProfile }}>
       {children}

@@ -96,10 +96,8 @@ apiClient.interceptors.response.use(
         // Nếu refresh thất bại (ví dụ refresh token cũng hết hạn)
         processQueue(refreshError, null);
         
-        // Xóa sạch và đẩy về login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        // Phát sự kiện để AuthContext dọn dẹp và điều hướng mềm
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
         
         return Promise.reject(refreshError);
       } finally {

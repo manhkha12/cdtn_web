@@ -8,6 +8,7 @@ import { MessagingApi } from "../../../repository/MessagingApi";
 import type { Message, SearchUserResult } from "../types";
 import type { CourseClass } from "../../../types";
 import { LecturerApi } from "../../../repository/LecturerApi";
+import { useSemester } from "../../../components/context/SemesterContext";
 import { useMessaging } from "../../../components/context/MessagingContext";
 import toast from "react-hot-toast";
 import PageTitle from "../../../components/common/PageTitle";
@@ -20,6 +21,7 @@ export const CommunicationPage: React.FC = () => {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [myClasses, setMyClasses] = useState<CourseClass[]>([]);
+  const { selectedSemesterId } = useSemester();
 
   const { 
     conversations, 
@@ -65,16 +67,18 @@ export const CommunicationPage: React.FC = () => {
   }, [selectedConvId, markAsRead, joinConversation, leaveConversation]);
 
   useEffect(() => {
+    if (!selectedSemesterId) return;
+
     const fetchClasses = async () => {
       try {
-        const classes = await LecturerApi.getMyClasses();
+        const classes = await LecturerApi.getMyClasses(selectedSemesterId);
         setMyClasses(classes);
       } catch (error) {
         console.error("Failed to fetch classes", error);
       }
     };
     fetchClasses();
-  }, []);
+  }, [selectedSemesterId]);
 
   // Listen for new messages to update the current chat view
   const selectedConversation = conversations.find(c => String(c.id) === String(selectedConvId));

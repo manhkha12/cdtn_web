@@ -1,6 +1,7 @@
 import React from "react";
 import type { CourseClass } from "../../../types";
 import Card from "../../../components/common/Card";
+import { isClassPassed } from "../utils/scheduleUtils";
 
 interface WeeklyScheduleGridProps {
   classes: CourseClass[];
@@ -22,6 +23,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({ classes,
         label: i === 6 ? "Chủ nhật" : `Thứ ${i + 2}`,
         date: d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
         value: i === 6 ? 8 : i + 2, // Map to backend day_of_week (2-8)
+        dateObj: d,
       };
     });
   };
@@ -116,24 +118,35 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({ classes,
                 return (
                   <td key={`${day.value}-${bIdx}`} className="border-r border-b border-slate-100 p-2 align-top bg-white transition-colors group-hover:bg-slate-50/5">
                     <div className="flex flex-col gap-2">
-                      {dayClasses.map((cls) => (
-                        <Card 
-                          key={cls.id}
-                          onClick={() => onClassClick(cls.id)}
-                          className="p-3 border border-yellow-100 bg-yellow-50/40 hover:bg-yellow-50 transition-all cursor-pointer shadow-none hover:shadow-md"
-                        >
-                          <div className="space-y-0.5 text-[10px] text-slate-700">
-                            <p className="font-medium leading-tight">
-                              -Môn: <span className="font-bold">{cls.subject.subject_name}</span> ({cls.subject.subject_code})
-                            </p>
-                            <p className="font-medium">-Mã LHP: <span className="font-bold">{cls.id}</span></p>
-                            <p className="font-medium">-Lớp: <span className="font-bold">{cls.id}</span></p>
-                            <p className="font-medium">-Giờ: <span className="font-bold">{cls.lesson_slot.replace('-', ' -> ')}</span></p>
-                            <p className="font-medium">-Phòng: <span className="font-bold">{cls.room}</span></p>
-                            <p className="font-medium">-Nội dung : </p>
-                          </div>
-                        </Card>
-                      ))}
+                      {dayClasses.map((cls) => {
+                        const isFinished = isClassPassed(cls, day.dateObj);
+                        return (
+                          <Card 
+                            key={cls.id}
+                            onClick={isFinished ? undefined : () => onClassClick(cls.id)}
+                            className={`p-3 border transition-all shadow-none ${
+                              isFinished 
+                                ? "border-slate-200 bg-slate-50/50 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none" 
+                                : "border-yellow-100 bg-yellow-50/40 hover:bg-yellow-50 cursor-pointer hover:shadow-md"
+                            }`}
+                          >
+                            <div className={`space-y-0.5 text-[10px] ${isFinished ? "text-slate-400" : "text-slate-700"}`}>
+                              <p className="font-medium leading-tight">
+                                -Môn: <span className={isFinished ? "font-medium" : "font-bold"}>{cls.subject.subject_name}</span> ({cls.subject.subject_code})
+                              </p>
+                              <p className="font-medium">-Mã LHP: <span className={isFinished ? "font-medium" : "font-bold"}>{cls.id}</span></p>
+                              <p className="font-medium">-Lớp: <span className={isFinished ? "font-medium" : "font-bold"}>{cls.id}</span></p>
+                              <p className="font-medium">-Giờ: <span className={isFinished ? "font-medium" : "font-bold"}>{cls.lesson_slot.replace('-', ' -> ')}</span></p>
+                              <p className="font-medium">-Phòng: <span className={isFinished ? "font-medium" : "font-bold"}>{cls.room}</span></p>
+                              {isFinished && (
+                                <p className="font-bold text-[9px] text-slate-400 mt-1 uppercase tracking-wide">
+                                  Đã kết thúc
+                                </p>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
                       {dayClasses.length === 0 && (
                         <div className="h-10"></div>
                       )}

@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
-import { io, Socket } from "socket.io-client";
-import { API_BASE_URL } from "../repository/api";
 import { AttendanceApi } from "../repository/AttendanceApi";
 import type { AttendanceStudent } from "../mock/attendanceData";
 import AttendanceHeader from "../features/attendance/components/AttendanceHeader";
 import AttendanceTable from "../features/attendance/components/AttendanceTable";
 import { EditStatusModal } from "../features/attendance/components/EditStatusModal";
 import { LecturerApi } from "../repository/LecturerApi";
+import { useSemester } from "../components/context/SemesterContext";
 import { CourseClassApi } from "../repository/CourseClassApi";
 import type { ClassStudent } from "../types";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import PageTitle from "../components/common/PageTitle";
+import { useQuery } from "@tanstack/react-query";
+import { useSocket } from "../components/context/SocketContext";
 
 interface AttendancePageProps {
   sessionId?: string | null;
@@ -42,11 +43,12 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ sessionId: propS
   const { sessionId: paramSessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const sessionId = propSessionId || paramSessionId;
+  const { selectedSemesterId } = useSemester();
+  const { getSocket } = useSocket();
 
   const [studentData, setStudentData] = useState<AttendanceStudent[]>([]);
-  const [sessionDetails, setSessionDetails] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isAutoSelecting, setIsAutoSelecting] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<AttendanceStudent | null>(null);
@@ -69,14 +71,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ sessionId: propS
   // 1. Smart Auto-select session if none provided
   useEffect(() => {
     if (!sessionId) {
+      if (!selectedSemesterId) return;
+
       const autoSelect = async () => {
-        setLoading(true);
+        setIsAutoSelecting(true);
         try {
           const now = new Date();
           const todayValue = now.getDay() === 0 ? 8 : now.getDay() + 1;
           
           // 1.1 Tìm các lớp được phân công hôm nay
-          const myClasses = await LecturerApi.getMyClasses();
+          const myClasses = await LecturerApi.getMyClasses(selectedSemesterId);
           const todayClasses = myClasses.filter(c => c.day_of_week === todayValue);
           
           // 1.2 Tìm lớp đang dạy hoặc sắp dạy
@@ -92,109 +96,109 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ sessionId: propS
               return;
             }
           }
-
-          // 1.3 Fallback: No general 'get all sessions' endpoint in backend, 
-          // so we don't do anything here. The user will need to select from schedule.
           console.log("No active class session found to auto-select.");
         } catch (error) {
           console.error("Auto-select session failed:", error);
         } finally {
-          setLoading(false);
+          setIsAutoSelecting(false);
         }
       };
       autoSelect();
     }
-  }, [sessionId, navigate]);
+  }, [sessionId, navigate, selectedSemesterId]);
 
-  // 2. Load session data and setup socket
+  // 2. React Query: Load session details
+  const { data: sessionDetails = null, isLoading: loadingSession } = useQuery({
+    queryKey: ["sessionDetails", sessionId],
+    queryFn: () => AttendanceApi.getSessionDetails(sessionId!),
+    enabled: !!sessionId,
+  });
+
+  const classId = sessionDetails?.course_class_id;
+
+  // 3. React Query: Load students of this course class
+  const { data: classStudents = null, isLoading: loadingStudents } = useQuery({
+    queryKey: ["classStudents", classId],
+    queryFn: () => CourseClassApi.getStudentsByClass(classId!),
+    enabled: !!classId,
+  });
+
+  // Combine query results and set local student state
+  useEffect(() => {
+    if (!sessionDetails || !classStudents) return;
+
+    const records = sessionDetails.records || [];
+    const mapped = classStudents.map((cs: ClassStudent): AttendanceStudent => {
+      const record = records.find((r: any) => 
+        r.student_id?.toString() === cs.id.toString() || r.student?.student_code === cs.student_code
+      );
+      
+      return {
+        id: record?.id || `temp-${cs.id}`,
+        name: cs.full_name,
+        studentId: cs.student_code,
+        email: cs.email || `${cs.student_code}@student.tlu.edu.vn`,
+        avatar: cs.avatar_url || "",
+        status: record ? mapStatusToFrontend(record.status, record.attendance_method) : 'absent',
+        dbStudentId: cs.id,
+        absenceRate: 0,
+        totalAbsences: 0,
+        attendanceHistory: []
+      };
+    });
+    setStudentData(mapped);
+  }, [sessionDetails, classStudents]);
+
+  // 4. Socket.IO connection and updates
   useEffect(() => {
     if (!sessionId) return;
 
-    let socket: Socket | null = null;
+    const socket = getSocket('/attendance');
 
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        // 1. Load session details first
-        const details = await AttendanceApi.getSessionDetails(sessionId);
-        setSessionDetails(details);
-        
-        const classId = details.course_class_id;
-
-        // 2. Extract records from details and fetch class students
-        const records = details.records || [];
-        const [classStudents] = await Promise.all([
-          CourseClassApi.getStudentsByClass(classId)
-        ]);
-        
-        // 3. Map students, merging status from records
-        const mapped = classStudents.map((cs: ClassStudent): AttendanceStudent => {
-          const record = records.find((r: any) => 
-            r.student_id?.toString() === cs.id.toString() || r.student?.student_code === cs.student_code
-          );
-          
-          return {
-            id: record?.id || `temp-${cs.id}`, // Use record id or temp id
-            name: cs.full_name,
-            studentId: cs.student_code,
-            email: cs.email || `${cs.student_code}@student.tlu.edu.vn`,
-            avatar: cs.avatar_url || "",
-            status: record ? mapStatusToFrontend(record.status, record.attendance_method) : 'absent',
-            // Store original student id for record creation
-            dbStudentId: cs.id,
-            absenceRate: 0,
-            totalAbsences: 0,
-            attendanceHistory: []
-          };
-        });
-        setStudentData(mapped);
-
-        // Setup socket
-        socket = io(API_BASE_URL + '/attendance', { 
-          transports: ['websocket', 'polling'] 
-        });
-        socket.on('connect', () => {
-          socket?.emit('joinSession', { sessionId });
-        });
-
-        socket.on('attendanceUpdated', (data) => {
-          const record = data.record;
-          setStudentData(prev => prev.map(s => 
-            (s.id === record.id || s.dbStudentId?.toString() === record.student_id?.toString())
-              ? { ...s, id: record.id, status: mapStatusToFrontend(record.status, record.attendance_method) }
-              : s
-          ));
-        });
-
-        socket.on('attendanceBulkUpdated', (data) => {
-          const bulkRecords = data.records;
-          setStudentData(prev => prev.map(s => {
-            const updated = bulkRecords.find((r: any) => 
-              r.id === s.id || r.student_id?.toString() === s.dbStudentId?.toString()
-            );
-            if (updated) {
-              return { ...s, id: updated.id, status: mapStatusToFrontend(updated.status, updated.attendance_method) };
-            }
-            return s;
-          }));
-        });
-
-      } catch (err) {
-        console.error("Error loading attendance data:", err);
-      } finally {
-        setLoading(false);
-      }
+    const handleConnect = () => {
+      socket.emit('joinSession', { sessionId });
     };
 
-    loadData();
+    const handleAttendanceUpdated = (data: any) => {
+      const record = data.record;
+      setStudentData(prev => prev.map(s => 
+        (s.id === record.id || s.dbStudentId?.toString() === record.student_id?.toString())
+          ? { ...s, id: record.id, status: mapStatusToFrontend(record.status, record.attendance_method) }
+          : s
+      ));
+    };
+
+    const handleAttendanceBulkUpdated = (data: any) => {
+      const bulkRecords = data.records;
+      setStudentData(prev => prev.map(s => {
+        const updated = bulkRecords.find((r: any) => 
+          r.id === s.id || r.student_id?.toString() === s.dbStudentId?.toString()
+        );
+        if (updated) {
+          return { ...s, id: updated.id, status: mapStatusToFrontend(updated.status, updated.attendance_method) };
+        }
+        return s;
+      }));
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('attendanceUpdated', handleAttendanceUpdated);
+    socket.on('attendanceBulkUpdated', handleAttendanceBulkUpdated);
+
+    // Join room if already connected
+    if (socket.connected) {
+      socket.emit('joinSession', { sessionId });
+    }
 
     return () => {
-      if (socket) {
-        socket.emit('leaveSession', { sessionId });
-        socket.disconnect();
-      }
+      socket.emit('leaveSession', { sessionId });
+      socket.off('connect', handleConnect);
+      socket.off('attendanceUpdated', handleAttendanceUpdated);
+      socket.off('attendanceBulkUpdated', handleAttendanceBulkUpdated);
     };
-  }, [sessionId]);
+  }, [sessionId, getSocket]);
+
+  const loading = isAutoSelecting || loadingSession || loadingStudents;
 
 
 

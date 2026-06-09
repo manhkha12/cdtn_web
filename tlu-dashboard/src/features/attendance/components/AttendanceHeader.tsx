@@ -1,5 +1,5 @@
 import React from "react";
-import { Printer, Save } from "lucide-react";
+import { Printer } from "lucide-react";
 
 interface AttendanceHeaderProps {
   courseTitle: string;
@@ -65,14 +65,15 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             onClick={onExport}
             disabled={isExporting}
             className="px-6 py-4 bg-white text-slate-700 font-black text-xs uppercase tracking-widest rounded-2xl border-2 border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          
           >
             <Printer size={16} strokeWidth={2.5} />
             {isExporting ? "Exporting..." : "Export List"}
           </button>
-          <button className="px-8 py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-red-600 hover:shadow-2xl hover:shadow-red-500/30 transition-all duration-300 flex items-center gap-3 group">
+          {/* <button className="px-8 py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-red-600 hover:shadow-2xl hover:shadow-red-500/30 transition-all duration-300 flex items-center gap-3 group">
             <Save size={16} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
             Finalize Session
-          </button>
+          </button> */}
         </div>
       </div>
     </div>

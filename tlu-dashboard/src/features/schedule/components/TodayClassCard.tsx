@@ -2,6 +2,7 @@
 import React, { useMemo } from "react";
 import { Clock, MapPin, Users } from "lucide-react";
 import type { CourseClass } from "../../../types";
+import { isClassPassed } from "../utils/scheduleUtils";
 
 interface Props {
   data: CourseClass;
@@ -13,11 +14,15 @@ const TodayClassCard: React.FC<Props> = ({ data, onClick, onViewStudents }) => {
   // Logic tính toán trạng thái thực tế dựa trên thời gian
   const calculatedStatus = useMemo(() => {
     try {
+      const now = new Date();
+      if (isClassPassed(data, now)) {
+        return 'FINISHED';
+      }
+
       const parts = data.lesson_slot.match(/\d+/g)?.map(Number);
       if (!parts || parts.length === 0) return 'UP NEXT';
       
       const startHour = parts[0];
-      const now = new Date();
       const currentHour = now.getHours();
 
       if (currentHour >= startHour && currentHour < startHour + 2) {
@@ -30,7 +35,7 @@ const TodayClassCard: React.FC<Props> = ({ data, onClick, onViewStudents }) => {
     } catch {
       return data.status || 'UP NEXT';
     }
-  }, [data.lesson_slot, data.status]);
+  }, [data]);
 
   // Logic đổ màu theo trạng thái
   const getStatusStyles = (status: string) => {
@@ -39,18 +44,27 @@ const TodayClassCard: React.FC<Props> = ({ data, onClick, onViewStudents }) => {
         return "text-red-600 bg-red-50 border-red-100";
       case 'UP NEXT':
         return "text-blue-600 bg-blue-50 border-blue-100";
+      case 'FINISHED':
+        return "text-slate-400 bg-slate-100 border-slate-200";
       default: // AFTERNOON hoặc khác
         return "text-slate-400 bg-slate-50 border-slate-100";
     }
   };
 
+  const isFinished = calculatedStatus === 'FINISHED';
+
   return (
     <div 
-      onClick={onClick}
-      className={`relative bg-white p-6 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md ${
-      calculatedStatus === 'ONGOING' ? 'border-red-400 shadow-lg ring-2 ring-red-50' : 
-      calculatedStatus === 'UP NEXT' ? 'border-blue-400 shadow-lg' : 'border-transparent shadow-sm'
-    }`}>
+      onClick={isFinished ? undefined : onClick}
+      className={`relative bg-white p-6 rounded-2xl border-2 transition-all ${
+        isFinished 
+          ? 'border-slate-200 bg-slate-50/50 opacity-60 cursor-not-allowed' 
+          : `cursor-pointer hover:shadow-md ${
+              calculatedStatus === 'ONGOING' ? 'border-red-400 shadow-lg ring-2 ring-red-50' : 
+              calculatedStatus === 'UP NEXT' ? 'border-blue-400 shadow-lg' : 'border-transparent shadow-sm'
+            }`
+      }`}
+    >
       <div className="flex justify-between items-start mb-6">
         <div className={`px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-wider border ${getStatusStyles(calculatedStatus)}`}>
           {calculatedStatus}
@@ -61,14 +75,11 @@ const TodayClassCard: React.FC<Props> = ({ data, onClick, onViewStudents }) => {
               e.stopPropagation();
               onViewStudents?.(e);
             }}
-            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
             title="Danh sách sinh viên"
           >
             <Users size={18} />
           </button>
-          {/* <button className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all">
-            <MoreVertical size={18} />
-          </button> */}
         </div>
       </div>
 

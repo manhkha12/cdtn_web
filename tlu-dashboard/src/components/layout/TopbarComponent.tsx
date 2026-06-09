@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Bell, LogOut, User, Mail, Phone, Book, GraduationCap, X, Award } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useSemester } from "../context/SemesterContext";
 
 interface TopbarProps {
   notificationCount?: number;
@@ -12,6 +13,7 @@ export const TopbarComponent: React.FC<TopbarProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const { user, logout } = useAuth();
+  const { semesters, selectedSemesterId, setSelectedSemesterId, loading: loadingSemesters } = useSemester();
 
   const lecturer = user?.lecturer;
   const fullName = lecturer?.full_name || user?.username || "Giảng viên";
@@ -30,11 +32,34 @@ export const TopbarComponent: React.FC<TopbarProps> = ({
   return (
     <header className="bg-[#800000] shadow-sm relative z-30">
       <div className="h-14 px-6 flex items-center justify-between gap-6">
-        {/* University Title */}
-        <div className="flex items-center">
-          <h1 className="text-white font-bold text-sm md:text-base tracking-wider uppercase">
+        {/* University Title & Semester Selector */}
+        <div className="flex items-center gap-6">
+          <h1 className="text-white font-bold text-sm md:text-base tracking-wider uppercase hidden sm:block">
             TRƯỜNG ĐẠI HỌC THĂNG LONG
           </h1>
+          
+          {/* Semester Selector Dropdown */}
+          {!loadingSemesters && semesters.length > 0 && (
+            <div className="relative">
+              <select
+                value={selectedSemesterId || ""}
+                onChange={(e) => setSelectedSemesterId(e.target.value)}
+                className="bg-white/15 hover:bg-white/25 text-white font-black text-[11px] uppercase tracking-wider py-1.5 pl-3 pr-8 rounded-xl border border-white/20 shadow-inner focus:outline-none focus:ring-2 focus:ring-white/40 cursor-pointer appearance-none transition-all duration-300"
+              >
+                {semesters.map((s) => (
+                  <option key={s.id} value={s.id} className="text-slate-900 bg-white font-semibold normal-case">
+                    {s.semester_name} ({s.academic_year})
+                  </option>
+                ))}
+              </select>
+              {/* Custom Chevron Icon */}
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-white/80">
+                <svg className="fill-current h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                </svg>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Section */}

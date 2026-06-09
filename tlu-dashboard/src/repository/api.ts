@@ -34,5 +34,8 @@ export const ENDPOINTS = {
   },
   USERS: {
     ME: '/users/me',
+  },
+  SEMESTERS: {
+    BASE: '/semesters',
   }
 };

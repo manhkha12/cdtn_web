@@ -8,13 +8,20 @@ import { CommunicationPage } from "./features/communication/pages/CommunicationP
 import AdminLogin from "./features/login/Login";
 import { AuthProvider, useAuth } from "./components/context/AuthContext"; 
 import { MessagingProvider } from "./components/context/MessagingContext";
+import { SemesterProvider } from "./components/context/SemesterContext";
+import { SocketProvider } from "./components/context/SocketContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Component trung gian để bọc MessagingProvider cho các route cần thiết
+// Component trung gian để bọc MessagingProvider và SocketProvider cho các route cần thiết
 const AuthenticatedArea = () => {
   return (
-    <MessagingProvider>
-      <DashboardLayout />
-    </MessagingProvider>
+    <SocketProvider>
+      <MessagingProvider>
+        <SemesterProvider>
+          <DashboardLayout />
+        </SemesterProvider>
+      </MessagingProvider>
+    </SocketProvider>
   );
 };
 
@@ -51,14 +58,18 @@ const AppRoutes = () => {
   );
 };
 
+const queryClient = new QueryClient();
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-        <Toaster position="top-right" />
-      </Router>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+          <Toaster position="top-right" />
+        </Router>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

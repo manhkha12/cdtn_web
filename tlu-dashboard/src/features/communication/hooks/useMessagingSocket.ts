@@ -1,11 +1,11 @@
 // src/features/communication/hooks/useMessagingSocket.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Socket } from 'socket.io-client';
-import { io } from 'socket.io-client';
-import { API_BASE_URL } from '../../../repository/api';
+import { useSocket } from '../../../components/context/SocketContext';
 import type { Message, ServerToClientEvents, ClientToServerEvents } from '../types';
 
 export const useMessagingSocket = (onNewMessage?: (msg: Message) => void) => {
+  const { getSocket } = useSocket();
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -18,15 +18,12 @@ export const useMessagingSocket = (onNewMessage?: (msg: Message) => void) => {
   }, [onNewMessage]);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
-
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(`${API_BASE_URL}/messaging`, {
-      auth: { token },
-      transports: ['websocket', 'polling'], // Cho phép polling nếu websocket lỗi
-    });
-
+    const socket = getSocket('/messaging') as Socket<ServerToClientEvents, ClientToServerEvents>;
     socketRef.current = socket;
+
+    if (socket.connected) {
+      setIsConnected(true);
+    }
 
     socket.on('connect', () => {
       setIsConnected(true);
@@ -54,9 +51,13 @@ export const useMessagingSocket = (onNewMessage?: (msg: Message) => void) => {
     });
 
     return () => {
-      socket.disconnect();
+      socket.off('connect');
+      socket.off('newMessage');
+      socket.off('messageSent' as any);
+      socket.off('userOnline');
+      socket.off('userOffline');
     };
-  }, []); // Chỉ chạy một lần khi mount
+  }, [getSocket]); // Chỉ chạy một lần khi mount
 
   const sendMessage = useCallback((conversationId: string, content: string, messageType: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT', mediaUrl?: string) => {
     if (socketRef.current) {

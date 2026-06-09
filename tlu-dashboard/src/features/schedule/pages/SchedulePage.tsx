@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import TodayClassCard from "../components/TodayClassCard";
 import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List } from "lucide-react";
 import { LecturerApi } from "../../../repository/LecturerApi";
+import { useSemester } from "../../../components/context/SemesterContext";
 import { AttendanceApi } from "../../../repository/AttendanceApi";
 import type { CourseClass } from "../../../types";
 import toast from "react-hot-toast";
@@ -11,6 +12,7 @@ import { WeeklyScheduleGrid } from "../components/WeeklyScheduleGrid";
 import PageTitle from "../../../components/common/PageTitle";
 
 export const SchedulePage: React.FC = () => {
+  const { selectedSemesterId } = useSemester();
   const [classes, setClasses] = useState<CourseClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<{ id: string; name: string } | null>(null);
@@ -18,9 +20,12 @@ export const SchedulePage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!selectedSemesterId) return;
+
     const fetchSchedule = async () => {
+      setLoading(true);
       try {
-        const data = await LecturerApi.getMyClasses();
+        const data = await LecturerApi.getMyClasses(selectedSemesterId);
         console.log("[SchedulePage] Fetched classes:", data);
         setClasses(data);
       } catch (error: any) {
@@ -32,7 +37,7 @@ export const SchedulePage: React.FC = () => {
       }
     };
     fetchSchedule();
-  }, []);
+  }, [selectedSemesterId]);
 
   const handleClassClick = async (classId: string) => {
     try {

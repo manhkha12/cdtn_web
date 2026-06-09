@@ -95,5 +95,13 @@ export interface AttendanceRecord {
   };
 }
 
+export interface Semester {
+  id: string;
+  semester_name: string;
+  academic_year: string;
+  tuition_per_credit?: number;
+}
+
+
 
 

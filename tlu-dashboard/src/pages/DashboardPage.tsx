@@ -1,67 +1,65 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import WelcomeSection from "../features/dashboard/components/WelcomeSection";
 import QuickAnnouncement from "../features/dashboard/components/QuickAnnouncement";
 import AttendancePage from "./AttendancePage";
 import { ArrowLeft, BookOpen, Users, LayoutGrid, Clock, Calendar } from "lucide-react";
 import Card from "../components/common/Card";
 import { AttendanceApi } from "../repository/AttendanceApi";
-import { StatisticsApi, type AttendanceOverview, type AttendanceChartData, type AtRiskStudent } from "../repository/StatisticsApi";
+import { StatisticsApi } from "../repository/StatisticsApi";
 import { LecturerApi } from "../repository/LecturerApi";
-import type { AttendanceSession, CourseClass } from "../types";
+
 import AttendanceStatsWidget from "../features/dashboard/components/AttendanceStatsWidget";
 import AttendanceChartWidget from "../features/dashboard/components/AttendanceChartWidget";
 import AtRiskStudentsWidget from "../features/dashboard/components/AtRiskStudentsWidget";
 import { useAuth } from "../components/context/AuthContext";
+import { useSemester } from "../components/context/SemesterContext";
 import PageTitle from "../components/common/PageTitle";
+import { useQuery } from "@tanstack/react-query";
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const { selectedSemesterId } = useSemester();
   const [viewMode, setViewMode] = useState<"overview" | "courses" | "students">(
     "overview",
   );
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<AttendanceSession[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(false);
 
-  // Stats State
-  const [overview, setOverview] = useState<AttendanceOverview | null>(null);
-  const [chartData, setChartData] = useState<AttendanceChartData | null>(null);
-  const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
-  const [myClasses, setMyClasses] = useState<CourseClass[]>([]);
-  const [loadingStats, setLoadingStats] = useState(true);
+  // 1. Tải Overview stats qua React Query
+  const { data: overview = null, isLoading: loadingOverview } = useQuery({
+    queryKey: ["attendanceOverview", selectedSemesterId],
+    queryFn: () => StatisticsApi.getOverview({ semesterId: selectedSemesterId }),
+    enabled: viewMode === "overview" && !!selectedSemesterId,
+  });
 
-  useEffect(() => {
-    if (viewMode === "overview") {
-      const fetchStats = async () => {
-        setLoadingStats(true);
-        try {
-          const [ov, chart, risk, classes] = await Promise.all([
-            StatisticsApi.getOverview(),
-            StatisticsApi.getChartData(),
-            StatisticsApi.getStudentsAtRisk(),
-            LecturerApi.getMyClasses()
-          ]);
-          setOverview(ov);
-          setChartData(chart);
-          setAtRiskStudents(risk);
-          setMyClasses(classes);
-        } catch (error) {
-          console.error("Failed to fetch dashboard stats:", error);
-        } finally {
-          setLoadingStats(false);
-        }
-      };
-      fetchStats();
-    }
+  // 2. Tải Chart data qua React Query
+  const { data: chartData = null, isLoading: loadingChart } = useQuery({
+    queryKey: ["attendanceChart", selectedSemesterId],
+    queryFn: () => StatisticsApi.getChartData({ semesterId: selectedSemesterId }),
+    enabled: viewMode === "overview" && !!selectedSemesterId,
+  });
 
-    if (viewMode === "courses") {
-      setLoadingSessions(true);
-      AttendanceApi.getSessions()
-        .then(setSessions)
-        .catch(console.error)
-        .finally(() => setLoadingSessions(false));
-    }
-  }, [viewMode]);
+  // 3. Tải sinh viên có nguy cơ cấm thi
+  const { data: atRiskStudents = [], isLoading: loadingRisk } = useQuery({
+    queryKey: ["studentsAtRisk", selectedSemesterId],
+    queryFn: () => StatisticsApi.getStudentsAtRisk({ semesterId: selectedSemesterId }),
+    enabled: viewMode === "overview" && !!selectedSemesterId,
+  });
+
+  // 4. Tải các lớp của giảng viên
+  const { data: myClasses = [], isLoading: loadingClasses } = useQuery({
+    queryKey: ["lecturerClasses", selectedSemesterId],
+    queryFn: () => LecturerApi.getMyClasses(selectedSemesterId!),
+    enabled: (viewMode === "overview" || viewMode === "courses") && !!selectedSemesterId,
+  });
+
+  // 5. Tải danh sách buổi học
+  const { data: sessions = [], isLoading: loadingSessions } = useQuery({
+    queryKey: ["attendanceSessions"],
+    queryFn: AttendanceApi.getSessions,
+    enabled: viewMode === "courses",
+  });
+
+  const loadingStats = loadingOverview || loadingChart || loadingRisk || loadingClasses;
 
   // --- VIEW 1: OVERVIEW (DASHBOARD CHÍNH) ---
   if (viewMode === "overview") {
